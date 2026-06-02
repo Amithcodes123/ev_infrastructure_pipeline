@@ -23,12 +23,8 @@ def run_unified_ingestion():
     gcs_client = storage.Client()
     bucket = gcs_client.bucket(bucket_name)
     
-    # -------------------------------------------------------------------------
-    # TASK 1: LIVE API STREAMING ENGINE (KBA Vehicle Demand Matrix)
-    # -------------------------------------------------------------------------
-    print("================================================================================")
-    print("📡 [KBA API ENGINE] Fetching Live Vehicle Registry Data Over the Web...")
-    print("================================================================================")
+  
+    print(" [KBA API ENGINE] Fetching Live Vehicle Registry Data Over the Web...")
     
     KBA_ENDPOINT_URL = "https://services-eu1.arcgis.com/U09msXRZoxesNntH/ArcGIS/rest/services/FZ%20Pkw%20mit%20Elektroantrieb%20Zulassungsbezirk/FeatureServer/0/query"
     api_params = {
@@ -51,7 +47,7 @@ def run_unified_ingestion():
             raise ValueError("Federal KBA API cluster returned an empty data array.")
             
         kba_df = pd.DataFrame(record_attributes)
-        print(f"✅ API Success: Downloaded {len(kba_df)} live regional records from KBA.")
+        print(f" API Success: Downloaded {len(kba_df)} live regional records from KBA.")
         
         # Normalize European decimal notations if present
         if "Pkw_BEV_Anteil" in kba_df.columns:
@@ -60,8 +56,8 @@ def run_unified_ingestion():
                 errors="coerce"
             )
             
-        # Archive snapshot copy to your static_sources folder
-        print("💾 Saving a backup historical snapshot to GCS bucket (static_sources/)...")
+        
+        print(" Saving a backup historical snapshot to GCS bucket (static_sources/)...")
         kba_blob = bucket.blob("static_sources/kba_vehicle_density.csv")
         kba_blob.upload_from_string(kba_df.to_csv(index=False, sep=";"), content_type="text/csv")
         
@@ -75,25 +71,21 @@ def run_unified_ingestion():
         print(f"🎉 [SUCCESS] KBA table perfectly materialized in BigQuery.")
         
     except Exception as e:
-        print(f"❌ [CRITICAL FAILURE] KBA API Extraction failed: {e}")
+        print(f" CRITICAL FAILURE KBA API Extraction failed: {e}")
         sys.exit(1)
 
     print("\n" + "="*80 + "\n")
 
-    # -------------------------------------------------------------------------
-    # TASK 2: CLOUD BULK STORAGE STREAMING ENGINE (BNetzA Hardware Registry)
-    # -------------------------------------------------------------------------
-    print("================================================================================")
-    print("📦 [BNETZA GCS ENGINE] Processing Mass Reference Hardware File from Cloud...")
-    print("================================================================================")
     
+    print(" [BNETZA GCS ENGINE] Processing Mass Reference Hardware File from Cloud...")
+   
     try:
         bnetza_blob = bucket.blob("static_sources/bnetza_registry.csv")
         
         if not bnetza_blob.exists():
             raise FileNotFoundError("Missing manual source file: Please upload bnetza_registry.csv into the 'static_sources' folder.")
             
-        # PRODUCTION SCALE PARSING UPGRADE
+       
         raw_text = bnetza_blob.download_as_text(encoding="latin-1")
         raw_lines = raw_text.splitlines()
         
@@ -103,9 +95,9 @@ def run_unified_ingestion():
                 skip_count = i
                 break
         
-        print(f"⚙️ Metadata Guard: Found true data schema. Skipping first {skip_count} introductory lines...")
+        print(f" Metadata Guard: Found true data schema. Skipping first {skip_count} introductory lines...")
 
-        # Re-read the CSV using the verified skipped index limit
+      
         bnetza_df = pd.read_csv(
             bnetza_blob.open("r", encoding="latin-1"), 
             sep=";", 
@@ -113,9 +105,9 @@ def run_unified_ingestion():
             engine="python",       
             on_bad_lines="skip"    
         )
-        print(f"✅ Cloud Storage Success: Loaded baseline data rows into memory safely.")
+        print(f" Cloud Storage Success: Loaded baseline data rows into memory safely.")
         
-        # 🗑️ TRASH COLLECTOR UPGRADE: Drop any completely empty columns or unnamed junk columns
+        
         bnetza_df = bnetza_df.loc[:, ~bnetza_df.columns.str.contains('^Unnamed')]
         bnetza_df = bnetza_df.dropna(how='all', axis=1)
         
@@ -132,17 +124,16 @@ def run_unified_ingestion():
             clean = clean.replace("(", "").replace(")", "")
             clean = clean.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
             clean = clean.replace(".", "_")
-            # If the column name is completely empty after cleaning, name it generic
+          
             if not clean:
                 clean = "corrupted_empty_column"
             cleaned_columns.append(clean)
             
         bnetza_df.columns = cleaned_columns
         
-        # Double check to drop any duplicate cleaned headers or completely broken text keys
+
         bnetza_df = bnetza_df.loc[:, ~bnetza_df.columns.str.contains('corrupted_empty_column')]
         
-        # Clean European commas to periods for mathematical float safety
         power_col = "Nennleistung_kw" if "Nennleistung_kw" in bnetza_df.columns else "Nennleistung_kW"
         if power_col in bnetza_df.columns:
             bnetza_df[power_col] = pd.to_numeric(
@@ -150,14 +141,14 @@ def run_unified_ingestion():
                 errors="coerce"
             )
             
-        # Stop drop-off anomalies by locking in a 5-digit string zero padding for zip codes
+        #
         zip_col = "Postleitzahl" if "Postleitzahl" in bnetza_df.columns else "PLZ"
         if zip_col in bnetza_df.columns:
             bnetza_df[zip_col] = bnetza_df[zip_col].astype(str).str.split('.').str[0].str.zfill(5)
             
         bnetza_table = f"{project_id}.bronze_layer.raw_bnetza_registry"
         
-        # Load cleaned bulk dataset into BigQuery
+        # Loading  cleaned bulk dataset into BigQuery
         bq_client.load_table_from_dataframe(
             bnetza_df, 
             bnetza_table,
@@ -166,8 +157,9 @@ def run_unified_ingestion():
         print(f"🎉 [SUCCESS] {len(bnetza_df):,} BNetzA hardware rows cleaned and sent to BigQuery.")
         
     except Exception as e:
-        print(f"❌ [CRITICAL FAILURE] BNetzA cloud storage processing failed: {e}")
+        print(f" [CRITICAL FAILURE] BNetzA cloud storage processing failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
     run_unified_ingestion()
+    
