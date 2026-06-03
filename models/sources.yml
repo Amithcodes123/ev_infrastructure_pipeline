@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: warehouse_bronze
+    database: ev-infrastructure-pipeline
+    schema: bronze_layer
+    tables:
+      - name: raw_live_occupancy
+      - name: raw_bnetza_registry
+      - name: raw_kba_demand
