@@ -17,9 +17,13 @@ from pyspark.sql import SparkSession
 import dotenv
 dotenv.load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-# FORCE SPARK TO USE YOUR EXACT PYTHON RUNTIME (Bypasses Windows Store Blocks)
-os.environ["PYSPARK_PYTHON"] = r"C:\Program Files\Python313\python.exe"
-os.environ["PYSPARK_DRIVER_PYTHON"] = r"C:\Program Files\Python313\python.exe"
+# 🏎️ CROSS-PLATFORM RUNTIME ENVELOPE (Supports both Windows Local and Linux Docker)
+if os.name == 'nt':
+    os.environ["PYSPARK_PYTHON"] = r"C:\Program Files\Python313\python.exe"
+    os.environ["PYSPARK_DRIVER_PYTHON"] = r"C:\Program Files\Python313\python.exe"
+else:
+    os.environ["PYSPARK_PYTHON"] = "python3"
+    os.environ["PYSPARK_DRIVER_PYTHON"] = "python3"
 
 # Setup production-grade structured logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
