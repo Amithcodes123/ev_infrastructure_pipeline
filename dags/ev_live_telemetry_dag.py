@@ -6,7 +6,7 @@ from airflow.operators.bash import BashOperator
 # 🛠️ PRODUCTION CONFIGURATION - Centralized Path Management
 # If running on native Windows, use: 'C:\\ev_pipeline'
 # If running on WSL/Linux/Docker (Standard), use: '/mnt/c/ev_pipeline'
-PROJECT_DIR = '/mnt/c/ev_pipeline'
+PROJECT_DIR = '/opt/airflow'
 PYTHON_EXEC = 'python3'
 
 default_args = {
@@ -34,12 +34,11 @@ with DAG(
         bash_command=f'{PYTHON_EXEC} {tomtom_script_path}',
     )
 
-    # TASK 2: Sync and Append the Staged Telemetry Cache to the BigQuery Bronze Dataset Table
+   # TASK 2: Sync and Append the Staged Telemetry Cache using a native Cloud Client execution
     append_cache_to_bronze = BashOperator(
         task_id='bigquery_append_telemetry_cache',
-        bash_command='bq load --source_format=CSV --skip_leading_rows=1 --write_disposition=WRITE_APPEND bronze_layer.raw_live_occupancy gs://ev-pipeline-bucket-amith/staged_imports/staged_live_occupancy.csv',
+        bash_command="python3 -c \"from google.cloud import bigquery; bq = bigquery.Client(); config = bigquery.LoadJobConfig(source_format=bigquery.SourceFormat.CSV, skip_leading_rows=1, write_disposition='WRITE_APPEND'); bq.load_table_from_uri('gs://ev-pipeline-bucket-amith/staged_imports/staged_live_occupancy.csv', f'{bq.project}.bronze_layer.raw_live_occupancy', job_config=config).result()\"",
     )
-
     # TASK 3: Trigger dbt Core Transformations (Profiles directory targeted inside project root)
     trigger_dbt_models = BashOperator(
         task_id='dbt_run_warehouse_transformations',
