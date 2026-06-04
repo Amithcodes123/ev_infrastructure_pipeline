@@ -5,7 +5,7 @@ from airflow.operators.bash import BashOperator
 
 
 
-PROJECT_DIR = '/mnt/c/ev_pipeline'
+PROJECT_DIR = '/opt/airflow'
 PYTHON_EXEC = 'python3'
 
 default_args = {
