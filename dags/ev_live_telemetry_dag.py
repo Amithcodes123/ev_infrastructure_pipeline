@@ -2,10 +2,6 @@ import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-
-# 🛠️ PRODUCTION CONFIGURATION - Centralized Path Management
-# If running on native Windows, use: 'C:\\ev_pipeline'
-# If running on WSL/Linux/Docker (Standard), use: '/mnt/c/ev_pipeline'
 PROJECT_DIR = '/opt/airflow'
 PYTHON_EXEC = 'python3'
 
@@ -20,7 +16,7 @@ with DAG(
     'ev_live_telemetry_dag',
     default_args=default_args,
     description='High-Frequency Telemetry Ingestion, GCS Landing, and dbt Cloud Curation Model',
-    schedule='*/15 * * * *',  # ⏱️ Wakes up precisely every 15 minutes
+    schedule='*/30 * * * *', 
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=['ev_infrastructure', 'telemetry', 'bigquery_production'],
