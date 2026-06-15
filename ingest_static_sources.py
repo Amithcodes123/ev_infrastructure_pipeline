@@ -7,7 +7,7 @@ import dotenv
 from google.cloud import bigquery
 from google.cloud import storage
 
-# Load secure environment credentials from your hidden .env file
+
 dotenv.load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 def run_unified_ingestion():
@@ -15,23 +15,23 @@ def run_unified_ingestion():
     bucket_name = os.getenv("GCS_BUCKET_NAME")
     
     if not project_id or not bucket_name:
-        print("CRITICAL CONFIG ERROR: Missing credentials parameters in environment vault.")
+        print("missing credentials")
         sys.exit(1)
         
-    # Initialize secure cloud clients
+ 
     bq_client = bigquery.Client(project=project_id)
     gcs_client = storage.Client()
     bucket = gcs_client.bucket(bucket_name)
     
   
-    print(" [KBA API ENGINE] Fetching Live Vehicle Registry Data Over the Web...")
+   
     
     KBA_ENDPOINT_URL = "https://services-eu1.arcgis.com/U09msXRZoxesNntH/ArcGIS/rest/services/FZ%20Pkw%20mit%20Elektroantrieb%20Zulassungsbezirk/FeatureServer/0/query"
     api_params = {
-        "where": "1=1",             # Pull all active German boundaries
-        "outFields": "*",           # Request all available metric attributes
-        "returnGeometry": "false",  # Skip heavy mapping shapes to prevent script timeout
-        "f": "json"                 # Stream back clean relational JSON structures
+        "where": "1=1",            
+        "outFields": "*",          
+        "returnGeometry": "false",  
+        "f": "json"                
     }
     headers = {"User-Agent": "DataEngineering-AutomatedPipeline/1.0"}
 
@@ -48,8 +48,7 @@ def run_unified_ingestion():
             
         kba_df = pd.DataFrame(record_attributes)
         print(f" API Success: Downloaded {len(kba_df)} live regional records from KBA.")
-        
-        # Normalize European decimal notations if present
+   
         if "Pkw_BEV_Anteil" in kba_df.columns:
             kba_df["Pkw_BEV_Anteil"] = pd.to_numeric(
                 kba_df["Pkw_BEV_Anteil"].astype(str).str.replace(",", "."), 
@@ -57,33 +56,28 @@ def run_unified_ingestion():
             )
             
         
-        print(" Saving a backup historical snapshot to GCS bucket (static_sources/)...")
+       
         kba_blob = bucket.blob("static_sources/kba_vehicle_density.csv")
         kba_blob.upload_from_string(kba_df.to_csv(index=False, sep=";"), content_type="text/csv")
-        
-        # Load directly to BigQuery Bronze Layer
+     
         kba_table = f"{project_id}.bronze_layer.raw_kba_demand"
         bq_client.load_table_from_dataframe(
             kba_df, 
             kba_table,
             job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
         ).result()
-        print(f"🎉 [SUCCESS] KBA table perfectly materialized in BigQuery.")
-        
+      
     except Exception as e:
-        print(f" CRITICAL FAILURE KBA API Extraction failed: {e}")
+       
         sys.exit(1)
 
     print("\n" + "="*80 + "\n")
-
-    
-    print(" [BNETZA GCS ENGINE] Processing Mass Reference Hardware File from Cloud...")
    
     try:
         bnetza_blob = bucket.blob("static_sources/bnetza_registry.csv")
         
         if not bnetza_blob.exists():
-            raise FileNotFoundError("Missing manual source file: Please upload bnetza_registry.csv into the 'static_sources' folder.")
+            raise FileNotFoundError("Missing manual source file")
             
        
         raw_text = bnetza_blob.download_as_text(encoding="latin-1")
@@ -105,7 +99,7 @@ def run_unified_ingestion():
             engine="python",       
             on_bad_lines="skip"    
         )
-        print(f" Cloud Storage Success: Loaded baseline data rows into memory safely.")
+        print(f" Loaded baseline data rows into memory.")
         
         
         bnetza_df = bnetza_df.loc[:, ~bnetza_df.columns.str.contains('^Unnamed')]
@@ -154,10 +148,10 @@ def run_unified_ingestion():
             bnetza_table,
             job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
         ).result()
-        print(f"🎉 [SUCCESS] {len(bnetza_df):,} BNetzA hardware rows cleaned and sent to BigQuery.")
+        print(f" {len(bnetza_df):,} BNetzA hardware rows sent to biqgquery.")
         
     except Exception as e:
-        print(f" [CRITICAL FAILURE] BNetzA cloud storage processing failed: {e}")
+        print(f" failed {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
