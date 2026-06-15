@@ -13,11 +13,11 @@ from requests.adapters import HTTPAdapter
 from google.cloud import storage
 from pyspark.sql import SparkSession
 
-# Load environment configurations
+
 import dotenv
 dotenv.load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-# 🏎️ CROSS-PLATFORM RUNTIME ENVELOPE (Supports both Windows Local and Linux Docker)
+
 if os.name == 'nt':
     os.environ["PYSPARK_PYTHON"] = r"C:\Program Files\Python313\python.exe"
     os.environ["PYSPARK_DRIVER_PYTHON"] = r"C:\Program Files\Python313\python.exe"
@@ -25,7 +25,6 @@ else:
     os.environ["PYSPARK_PYTHON"] = "python3"
     os.environ["PYSPARK_DRIVER_PYTHON"] = "python3"
 
-# Setup production-grade structured logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -104,17 +103,14 @@ def harvest_station_telemetry(
     return local_flat_records
 
 def run_cloud_native_pyspark_pipeline() -> None:
-    """Consolidates data across macro-regional target grids and streams to GCS."""
+    
     current_utc_time = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    logger.info("="*80)
-    logger.info(f"[START] Distributed German Macro Grid Telemetry Extraction Strategy")
-    logger.info(f"Execution Horizon Reference: {current_utc_time} UTC")
-    logger.info("="*80)
+    
     
     API_KEY = os.getenv("TOMTOM_PROD_API_KEY")
     BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
     if not API_KEY or not BUCKET_NAME:
-        logger.error("CRITICAL CONFIG ERROR: Missing credentials parameters in environment vault.")
+        logger.error(" Missing credentials .")
         sys.exit(1)
         
     http_client = create_resilient_session()
@@ -143,10 +139,10 @@ def run_cloud_native_pyspark_pipeline() -> None:
         all_aggregated_records.extend(records)
         
     if not all_aggregated_records:
-        logger.warning("All extraction targets yielded 0 components. Aborting upload routine.")
+        logger.warning("All extraction targets yielded 0 components.")
         sys.exit(1)
         
-    logger.info(f"Total compiled macro matrix contains {len(all_aggregated_records)} active connections.")
+    
     
     # Initialize Spark Engine Context
     logger.info("Initializing high-throughput Spark computational cluster environment...")
@@ -172,7 +168,7 @@ def run_cloud_native_pyspark_pipeline() -> None:
         blob = bucket.blob("staged_imports/staged_live_occupancy.csv")
         
         blob.upload_from_string(csv_buffer.getvalue(), content_type="text/csv")
-        logger.info(f" [SUCCESS] Multi-regional macro data stream written cleanly to storage target container.")
+        logger.info(f"  Multi-regional macro data stream written cleanly to storage target container.")
         
     except Exception as pipe_err:
         logger.error(f"Transformation or transmission routing breakdown: {pipe_err}", exc_info=True)
